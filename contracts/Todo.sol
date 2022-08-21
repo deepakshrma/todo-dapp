@@ -23,6 +23,13 @@ contract Todo {
     mapping(uint => TodoItem) todos;
     mapping(uint => address) owners;
 
+    event NewTodo(
+        address indexed _createdBy,
+        uint indexed _id,
+        string indexed _title
+    );
+    event UpdateTodo(address indexed _updatedBy, TodoItem indexed _todo);
+
     constructor() payable {
         owner = payable(msg.sender);
     }
@@ -47,7 +54,7 @@ contract Todo {
 
         todos[noOfTodos] = todo;
         owners[noOfTodos] = msg.sender;
-
+        emit NewTodo(msg.sender, noOfTodos, title);
         return noOfTodos;
     }
 
@@ -61,6 +68,8 @@ contract Todo {
         returns (TodoItem memory)
     {
         todos[id].status = Status.DELETED;
+        emit UpdateTodo(msg.sender, todos[id]);
+
         return todos[id];
     }
 
@@ -87,7 +96,7 @@ contract Todo {
         TodoItem[] memory ltodos = new TodoItem[](noOfTodos);
         for (uint i = 1; i <= noOfTodos; i++) {
             TodoItem storage lBid = todos[i];
-            ltodos[i-1] = lBid;
+            ltodos[i - 1] = lBid;
         }
         return ltodos;
     }

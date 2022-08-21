@@ -1,4 +1,4 @@
-module github.com/deepakshrma/todo-dapp
+module github.com/deepakshrma/tododapp
 
 go 1.18
 
@@ -6,7 +6,6 @@ require (
 	github.com/ethereum/go-ethereum v1.10.21
 	github.com/gin-gonic/gin v1.8.1
 	github.com/joho/godotenv v1.4.0
-	golang.org/x/crypto v0.0.0-20220817201139-bc19a97f63c8
 )
 
 require (
@@ -34,6 +33,7 @@ require (
 	github.com/tklauser/go-sysconf v0.3.5 // indirect
 	github.com/tklauser/numcpus v0.2.2 // indirect
 	github.com/ugorji/go/codec v1.2.7 // indirect
+	golang.org/x/crypto v0.0.0-20220817201139-bc19a97f63c8 // indirect
 	golang.org/x/net v0.0.0-20220607020251-c690dde0001d // indirect
 	golang.org/x/sys v0.0.0-20220818161305-2296e01440c6 // indirect
 	golang.org/x/text v0.3.7 // indirect

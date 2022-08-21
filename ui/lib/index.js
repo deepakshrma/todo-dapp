@@ -6,8 +6,10 @@ import {
   repeat,
   classMap,
 } from "https://cdn.jsdelivr.net/gh/lit/dist@2/all/lit-all.min.js";
+import "https://cdn.jsdelivr.net/gh/ethereum/web3.js@1.0.0-beta.34/dist/web3.min.js";
+
 const baseURL = "http://localhost:8080/api/v1";
-const request = (path, body, options = {}) => {
+const request = async (path, body, options = {}) => {
   let method = "GET";
   if (body) {
     method = "POST";
@@ -19,7 +21,8 @@ const request = (path, body, options = {}) => {
   if (body) {
     data.body = JSON.stringify(body);
   }
-  return fetch(`${baseURL}/${path}`, data).then((r) => r.json());
+  const r = await fetch(`${baseURL}/${path}`, data);
+  return await r.json();
 };
 
 const todoItem = ({ Title, Description, Id, Status = 0 }, { onItemClick }) => {
@@ -146,8 +149,87 @@ class AppElm extends LitElement {
 }
 
 customElements.define("d-app", AppElm);
-
 function App() {
   return html`<div><d-app></d-app></div>`;
 }
-render(App(), document.body);
+
+async function init() {
+  const web3 = new Web3(Web3.givenProvider || "ws://localhost:8545");
+  const configs = await request("configs");
+
+  const ABI = await fetch(`public/Todo_sol_Todo.abi`).then((r) => r.json());
+  configs.CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+  const contract = new web3.eth.Contract(ABI, configs.CONTRACT_ADDRESS);
+
+  console.log(contract.events);
+  //   let options = {
+  //     filter: {
+  //         value: [],
+  //     },
+  //     fromBlock: 0
+  // };
+  let options = {
+    filter: {},
+    // address: [], //Only get events from specific addresses
+    // topics: [], //What topics to subscribe to
+  };
+  contract.events
+    .NewTodo(options)
+    .on("data", (event) => console.log(event))
+    .on("changed", (changed) => console.log(changed))
+    .on("error", (err) => console.lo)
+    .on("connected", (str) => console.log(str));
+
+  contract.getPastEvents(
+    "NewTodo",
+    {
+      filter: {},
+      fromBlock: 0,
+      toBlock: "latest",
+    },
+    function (error, pastEvents) {
+      if (!error) {
+        console.log(pastEvents, "pastEvents");
+      } else {
+        console.error(error);
+      }
+    }
+  );
+  // contract.events["NewTodo(address,uint256,string)"](() => {})
+  //   .on("connected", function (subscriptionId) {
+  //     console.log("SubID: ", subscriptionId);
+  //   })
+
+  //   .on("data", function (event) {
+  //     console.log("Event:", event);
+  //     console.log("Owner Wallet Address: ", event.returnValues.owner);
+  //     //Write send email process here!
+  //   })
+  //   .on("changed", function (event) {
+  //     //Do something when it is removed from the database.
+  //   })
+  //   .on("error", function (error, receipt) {
+  //     console.log("Error:", error, receipt);
+  //   });
+
+  // let subscription = web3.eth.subscribe("logs", options, (err, event) => {
+  //   if (!err) console.log(event);
+  // });
+
+  // subscription.on("data", (event) => console.log(event));
+  // subscription.on("changed", (changed) => console.log(changed));
+  // subscription.on("error", (err) => {
+  //   throw err;
+  // });
+  // subscription.on("connected", (nr) => console.log(nr));
+  // let options = {
+  //   filter: {},
+  // };
+
+  // contract
+  //   .getPastEvents("NewTodo", options)
+  //   .then((results) => console.log(results))
+  //   .catch((err) => console.log);
+  render(App(), document.body);
+}
+init();
