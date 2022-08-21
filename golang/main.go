@@ -70,8 +70,22 @@ var (
 // }
 func Logger(eth *ethclient.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		fmt.Println(eth)
 		c.Set(contextKeyClient, eth)
+		c.Next()
+	}
+}
+func CORSMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+
 		c.Next()
 	}
 }
@@ -83,11 +97,11 @@ const ( // iota is reset to 0
 )
 
 type TodoItem struct {
-	Id          big.Int `form:"Id"`
-	Status      int     `form:"Status"`
-	Title       string  `form:"Title"`
-	Description string  `form:"Description"`
-	CreatedBy   string  `form:"CreatedBy"`
+	Id          int    `form:"Id"`
+	Status      int    `form:"Status"`
+	Title       string `form:"Title"`
+	Description string `form:"Description"`
+	CreatedBy   string `form:"CreatedBy"`
 }
 
 func main() {
@@ -107,6 +121,7 @@ func main() {
 	r := gin.New()
 	v1 := r.Group("/api/v1")
 	v1.Use(Logger(client))
+	v1.Use(CORSMiddleware())
 	v1.GET("/deploy", func(c *gin.Context) {
 		client := c.MustGet(contextKeyClient).(*ethclient.Client)
 		auth := getAuth(client, envs["PRIVATE_KEY"])
@@ -134,7 +149,6 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Println(c.Param("id"))
 		todoId := new(big.Int)
 		id, _ := todoId.SetString(c.Param("id"), 10)
 
@@ -147,32 +161,50 @@ func main() {
 		})
 	})
 	v1.POST("/todos/", func(c *gin.Context) {
-		var newTodo TodoItem
-		if c.ShouldBind(&newTodo) == nil {
-			client := c.MustGet(contextKeyClient).(*ethclient.Client)
-
-			address := common.HexToAddress(envs["CONTRACT_ADDRESS"])
-			instance, err := todo.NewTodo(address, client)
-			if err != nil {
-				log.Fatal(err)
-			}
-			auth := getAuth(client, envs["PRIVATE_KEY"])
-
-			fmt.Println(newTodo)
-			title := newTodo.Title
-			description := newTodo.Description
-			todoRes, err := instance.CreateTodo(auth, title, description)
-			if err != nil {
-				log.Fatal(err)
-			}
-			c.JSON(http.StatusOK, gin.H{
-				"data": todoRes,
-			})
-
+		var input TodoItem
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Something fail",
+		client := c.MustGet(contextKeyClient).(*ethclient.Client)
+
+		address := common.HexToAddress(envs["CONTRACT_ADDRESS"])
+		instance, err := todo.NewTodo(address, client)
+		if err != nil {
+			log.Fatal(err)
+		}
+		auth := getAuth(client, envs["PRIVATE_KEY"])
+
+		todo, err := instance.CreateTodo(auth, input.Title, input.Description)
+		_ = todo
+		if err != nil {
+			log.Fatal(err)
+		}
+		Id, _ := instance.NoOfTodos(nil)
+		newTodo, _ := instance.GetTodo(nil, Id)
+		c.JSON(http.StatusOK, gin.H{
+			"data": newTodo,
+		})
+		return
+
+	})
+	v1.POST("/todos/:id", func(c *gin.Context) {
+		client := c.MustGet(contextKeyClient).(*ethclient.Client)
+
+		address := common.HexToAddress("0x5FbDB2315678afecb367f032d93F642f64180aa3")
+		instance, err := todo.NewTodo(address, client)
+		if err != nil {
+			log.Fatal(err)
+		}
+		deleteId := big.NewInt(0)
+		id, _ := deleteId.SetString(c.Param("id"), 10)
+		auth := getAuth(client, envs["PRIVATE_KEY"])
+
+		instance.UpdateStatus(auth, id, 1)
+
+		todo, _ := instance.GetTodo(nil, id)
+		c.JSON(http.StatusOK, gin.H{
+			"data": todo,
 		})
 
 	})
@@ -203,7 +235,6 @@ func main() {
 			log.Fatal(err)
 		}
 
-		fmt.Println("contract is loaded")
 		noOfTodos, err := instance.NoOfTodos(nil)
 		if err != nil {
 			log.Fatal(err)
